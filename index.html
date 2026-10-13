@@ -198,6 +198,25 @@ dialog::backdrop{background:rgba(7,13,36,.55)}
 .grid td.calc.flash{animation:flashCell .8s ease-out}
 .grid td.in input:not(:focus){cursor:cell}
 
+/* branch badge + month/year picker */
+.period-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.branch-badge{display:flex;align-items:center;gap:8px;padding:5px 12px 5px 6px;border-radius:999px;cursor:text;
+  background:linear-gradient(180deg,var(--gold-2),var(--gold));box-shadow:0 2px 0 var(--gold-deep),inset 0 1px 0 rgba(255,255,255,.5)}
+.bb-lbl{font:700 10px Inter;letter-spacing:.12em;background:var(--navy);color:var(--gold-2);padding:4px 8px;border-radius:999px}
+.branch-badge input{border:0;background:transparent;outline:none;font:700 14px Inter;letter-spacing:.04em;color:var(--navy);text-transform:uppercase;width:230px}
+.branch-badge input::placeholder{color:rgba(10,22,64,.55)}
+.branch-badge:focus-within{box-shadow:0 0 0 3px rgba(255,255,255,.55),0 2px 0 var(--gold-deep)}
+.branch-badge.empty{animation:pulseBadge 1.6s ease-in-out infinite}
+@keyframes pulseBadge{50%{box-shadow:0 0 0 5px rgba(227,195,90,.35),0 2px 0 var(--gold-deep)}}
+.bb-pen{color:var(--navy);opacity:.6}
+.period-pick{display:flex;gap:6px}
+.period-pick select{appearance:none;-webkit-appearance:none;border:1px solid var(--silver);background:rgba(255,255,255,.12);color:#fff;font:600 13px Inter;
+  padding:8px 28px 8px 12px;border-radius:10px;cursor:pointer;
+  background-image:linear-gradient(45deg,transparent 50%,var(--gold-2) 50%),linear-gradient(135deg,var(--gold-2) 50%,transparent 50%);
+  background-position:calc(100% - 15px) 55%,calc(100% - 10px) 55%;background-size:5px 5px;background-repeat:no-repeat}
+.period-pick select option{color:#141B33}
+@media (max-width:520px){.branch-badge input{width:150px}.period-bar{width:100%}}
+
 </style>
 </head>
 <body>
@@ -206,7 +225,18 @@ dialog::backdrop{background:rgba(7,13,36,.55)}
     <div class="crest" aria-hidden="true">MTD</div>
     <div>
       <div class="brand-title">Month-to-Date Dashboard</div>
-      <div class="brand-sub"><span id="hdrStore">—</span> · <span id="hdrPeriod">—</span></div>
+      <div class="brand-sub"><span id="hdrPeriod">—</span></div>
+    </div>
+  </div>
+  <div class="period-bar">
+    <label class="branch-badge" title="Click to type your branch name">
+      <span class="bb-lbl">BRANCH</span>
+      <input id="branchInput" placeholder="INPUT YOUR BRANCH NAME" autocomplete="off" spellcheck="false">
+      <span class="bb-pen" aria-hidden="true">✎</span>
+    </label>
+    <div class="period-pick">
+      <select id="selMonth" aria-label="Month"></select>
+      <select id="selYear" aria-label="Year"></select>
     </div>
   </div>
   <div class="top-actions">
@@ -314,8 +344,7 @@ dialog::backdrop{background:rgba(7,13,36,.55)}
           <button class="btn ghost" id="btnTplReset">Use built-in template</button>
         </div>
         <div class="row-btns">
-          <button class="btn ghost" id="btnNewMonth">Start next month</button>
-          <button class="btn danger" id="btnReset">Reset to original data</button>
+                    <button class="btn danger" id="btnReset">Reset to original data</button>
         </div>
         <div class="hint" id="tplStatus"></div>
       </div>
@@ -4028,7 +4057,7 @@ window.MTD_TEMPLATE_B64="UEsDBBQABgAIAAAAIQCbnJbVLwIAAGISAAATAAgCW0NvbnRlbnRfVHl
     H.weeks = weeks.map(w => {
       const ds = DAYS.filter(d => d >= w.from && d <= w.to);
       const G = sum(ds.map(d => S[d].K)), Hh = sum(ds.map(d => S[d].G));
-      return { label: `${mon} ${w.from}-${w.to}`, from: w.from, to: w.to, TY: G, LY: Hh, chg: div(G - Hh, G) }; // =(G-H)/G
+      return { label: w.from === w.to ? `${mon} ${w.from}` : `${mon} ${w.from}-${w.to}`, from: w.from, to: w.to, TY: G, LY: Hh, chg: div(G - Hh, G) }; // =(G-H)/G
     });
     out.seas = { rows: S, total: T, head: H };
 
@@ -4109,11 +4138,11 @@ window.MTD_TEMPLATE_B64="UEsDBBQABgAIAAAAIQCbnJbVLwIAAGISAAATAAgCW0NvbnRlbnRfVHl
     out.sg = { rows: sg, total: sgt };
 
     // ---------- WML (weekly report) — template week blocks rows 25-32, 33-39, 40-46, 47-54, 55 ----------
-    const blocks = [[1, 8], [9, 15], [16, 22], [23, 30], [31, 31]];
-    const wml = blocks.map(([a, b]) => {
-      const ds = DAYS.filter(d => d >= a && d <= b);
+    // WML weekly report: Monday–Sunday weeks of the selected month (week 1 = day 1 up to the first Sunday)
+    const wml = H.weeks.map(w => {
+      const ds = DAYS.filter(d => d >= w.from && d <= w.to);
       const s = c => sum(ds.map(d => S[d][c]));
-      const r = { label: `${mon}. ${a === b ? a : a + '-' + b}`, B: s('G'), C: s('K'), F: s('P'), G: s('Q'), L: s('AL'), M: s('AM'), O: s('AI'), P: s('AJ') };
+      const r = { label: w.label, from: w.from, to: w.to, days: w.from === w.to ? weekday(dateOf(w.from)).slice(0, 3) : `${weekday(dateOf(w.from)).slice(0, 3)}–${weekday(dateOf(w.to)).slice(0, 3)}`, B: s('G'), C: s('K'), F: s('P'), G: s('Q'), L: s('AL'), M: s('AM'), O: s('AI'), P: s('AJ') };
       return wmlDerive(r, G15);
     });
     const wt = { label: 'TOTAL' }; for (const c of ['B', 'C', 'F', 'G', 'L', 'M', 'O', 'P']) wt[c] = sum(wml.map(r => r[c]));
@@ -4366,6 +4395,7 @@ window.MTD_TEMPLATE_B64="UEsDBBQABgAIAAAAIQCbnJbVLwIAAGISAAATAAgCW0NvbnRlbnRfVHl
       if (d <= 30) w.input('AG' + r, s.AG ?? '');
       w.calc('AD' + r, o.AD); w.calc('AH' + r, o.AH);
     }
+    for (const c of ['U', 'W', 'Y', 'AA', 'AC']) w.calc(c + '2', E.DAYS.reduce((t, d) => t + (out.ytd.shoes[d][c] || 0), 0)); // =SUM(x3:x33)
     w.calc('AD34', out.ytd.shoeTotal.AD); w.calc('AH34', out.ytd.shoeTotal.AH); w.calc('S1', out.ytd.S1);
     w.calc('AK3', out.ytd.AK3); w.calc('AK4', out.ytd.AK4); w.calc('AL3', out.ytd.AL3); w.calc('AK7', out.ytd.AK7);
 
@@ -4403,7 +4433,16 @@ window.MTD_TEMPLATE_B64="UEsDBBQABgAIAAAAIQCbnJbVLwIAAGISAAATAAgCW0NvbnRlbnRfVHl
 
     // WML (hidden weekly sheet)
     w = sheets['WML'];
-    out.wml.rows.forEach((x, k) => { const r = 6 + k; w.text('A' + r, x.label); for (const c of ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W']) w.calc(c + r, x[c]); });
+    const ST = "'Seasonality Template'!";
+    const SRC = { B: 'G', C: 'K', F: 'P', G: 'Q', L: 'AL', M: 'AM', O: 'AI', P: 'AJ' };
+    for (let k = 0; k < 6; k++) {
+      const r = 6 + k, x = out.wml.rows[k];
+      if (!x) { w.text('A' + r, ''); for (const c of ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W']) w.calc(c + r, ['B','C','F','G','I','J','L','M','O','P'].includes(c) ? 0 : '', ['B','C','F','G','L','M','O','P'].includes(c) ? '0' : (['I','J'].includes(c) ? (c === 'I' ? `B${r}-F${r}` : `C${r}-G${r}`) : null)); continue; }
+      const a = 24 + x.from, b = 24 + x.to;
+      w.text('A' + r, x.label);
+      for (const c in SRC) w.calc(c + r, x[c], `SUM(${ST}${SRC[c]}${a}:${SRC[c]}${b})`);
+      for (const c of ['D', 'E', 'H', 'I', 'J', 'K', 'N', 'Q', 'R', 'S', 'T', 'U', 'V', 'W']) w.calc(c + r, x[c]);
+    }
     for (const c of ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W']) w.calc(c + '12', out.wml.total[c]);
   }
 
@@ -4453,7 +4492,7 @@ window.MTD_TEMPLATE_B64="UEsDBBQABgAIAAAAIQCbnJbVLwIAAGISAAATAAgCW0NvbnRlbnRfVHl
 (function () {
   'use strict';
   const E = window.MTDEngine;
-  const K_STATE = 'mtd.state.v1', K_SET = 'mtd.settings.v1', K_TPL = 'mtd.template.v1', K_LOG = 'mtd.sendlog.v1', K_ARCH = 'mtd.archive.v1';
+  const K_STATE = 'mtd.state.v1', K_SET = 'mtd.settings.v1', K_TPL = 'mtd.template.v1', K_LOG = 'mtd.sendlog.v1', K_ARCH = 'mtd.archive.v1', K_MONTHS = 'mtd.months.v1';
   const $ = (s, el = document) => el.querySelector(s);
   const h = (tag, attrs = {}, ...kids) => {
     const el = document.createElement(tag);
@@ -4540,7 +4579,10 @@ window.MTD_TEMPLATE_B64="UEsDBBQABgAIAAAAIQCbnJbVLwIAAGISAAATAAgCW0NvbnRlbnRfVHl
     window.scrollTo({ top: 0 });
   }
   function refresh() {
-    $('#hdrStore').textContent = state.meta.store; $('#hdrPeriod').textContent = monthLabel();
+    const bi = $('#branchInput'); if (document.activeElement !== bi) bi.value = state.meta.store || '';
+    bi.closest('.branch-badge').classList.toggle('empty', !state.meta.store);
+    $('#hdrPeriod').textContent = (state.meta.store ? state.meta.store + ' · ' : '') + monthLabel();
+    $('#selMonth').value = String(+state.meta.monthStart.slice(5, 7)); $('#selYear').value = state.meta.monthStart.slice(0, 4);
     if (currentTab === 'dashboard') renderDashboard();
     else if (currentTab === 'entry') updateEntryLive();
     else updateBindings();
@@ -4893,8 +4935,8 @@ window.MTD_TEMPLATE_B64="UEsDBBQABgAIAAAAIQCbnJbVLwIAAGISAAATAAgCW0NvbnRlbnRfVHl
       const C = (c, label, fmt) => ({ c, label, fmt: fmt || 'money' });
       const cols = [C('B', `GROSS ${y - 1}`), C('C', `GROSS ${y}`), C('D', '% CHANGE', 'pct'), C('E', '% VS TARGET', 'pct'), C('F', `DISCOUNT ${y - 1}`), C('G', `DISCOUNT ${y}`), C('H', '% CHANGE', 'pct'), C('I', `NET ${y - 1}`), C('J', `NET ${y}`), C('K', '% CHANGE', 'pct'),
         C('L', `BUYING ${y - 1}`, 'int'), C('M', `BUYING ${y}`, 'int'), C('N', '% CHANGE', 'pct'), C('O', `ENTERING ${y - 1}`, 'int'), C('P', `ENTERING ${y}`, 'int'), C('Q', '% CHANGE', 'pct'), C('R', `AVE PURCHASE ${y - 1}`), C('S', `AVE PURCHASE ${y}`), C('T', '% CHANGE', 'pct'), C('U', `CONVERSION ${y - 1}`, 'pct'), C('V', `CONVERSION ${y}`, 'pct'), C('W', '% CHANGE', 'pct')];
-      const rows = o.rows.map(r => ({ label: r.label, get: c => r[c] })); rows.push({ label: 'TOTAL', cls: 'tot', get: c => o.total[c] });
-      return [sheetHeader('WML · WEEKLY REPORT', 'STORE SALES PERFORMANCE SUMMARY (hidden sheet in the workbook)'), grid(cols, rows)];
+      const rows = o.rows.map((r, i) => ({ label: `Week ${i + 1} · ${r.label} (${r.days})`, get: c => r[c] })); rows.push({ label: 'TOTAL', cls: 'tot', get: c => o.total[c] });
+      return [sheetHeader('WML · WEEKLY REPORT', `STORE SALES PERFORMANCE SUMMARY · ${periodLabel()} · weeks run Monday to Sunday`), grid(cols, rows)];
     }
   };
   function manualLike(title, key) {
@@ -4953,7 +4995,7 @@ window.MTD_TEMPLATE_B64="UEsDBBQABgAIAAAAIQCbnJbVLwIAAGISAAATAAgCW0NvbnRlbnRfVHl
     $('#btnSaveSettings').onclick = () => {
       const m = $('#sMonth').value;
       state.meta.store = $('#sStore').value.trim() || state.meta.store; state.meta.branch = $('#sBranch').value.trim();
-      if (m) state.meta.monthStart = m.slice(0, 8) + '01';
+      if (m && m.slice(0, 8) + '01' !== state.meta.monthStart) switchMonth(m.slice(0, 8) + '01');
       state.meta.target = E.num($('#sTarget').value); state.meta.gmTarget = E.num($('#sGM').value);
       state.meta.runningDays = $('#sRun').value.trim() === '' ? null : E.num($('#sRun').value);
       state.meta.recipient = $('#sTo').value.trim() || 'FranchiseDev@tobys.com';
@@ -4965,16 +5007,42 @@ window.MTD_TEMPLATE_B64="UEsDBBQABgAIAAAAIQCbnJbVLwIAAGISAAATAAgCW0NvbnRlbnRfVHl
     $('#fTemplate').onchange = async e => { const f = e.target.files[0]; if (!f) return; const b64 = await blobToB64(f); if (store.setRaw(K_TPL, b64)) { toast('Template replaced'); renderSettings(); } e.target.value = ''; };
     $('#btnTplReset').onclick = () => { store.del(K_TPL); renderSettings(); toast('Using built-in template'); };
     $('#btnReset').onclick = () => { if (!confirm('Reset everything to the original October workbook data? Your entries on this device will be lost.')) return; state = clone(window.MTD_SEED); persist(); recalc(); renderSettings(); toast('Reset done'); };
-    $('#btnNewMonth').onclick = () => {
-      if (!confirm('Archive this month on this device and start the next month with empty daily entries? LY/baseline columns and YTD tables are kept for you to update.')) return;
-      const arch = store.get(K_ARCH, []); arch.push({ month: state.meta.monthStart, state }); store.set(K_ARCH, arch.slice(-6));
-      const [y, m] = state.meta.monthStart.split('-').map(Number); const nx = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
-      const ns = clone(state); ns.meta.monthStart = nx; ns.meta.runningDays = null;
-      for (const d of E.DAYS) { ns.ls[d] = {}; ns.manual[d] = {}; ns.outsale[d] = {}; ns.eod.rows[d] = {}; ns.dep.rows[d] = {}; ns.sg.rows[d] = {}; ns.ytd.shoes[d] = {}; }
-      ns.msi = []; ns.mret = []; ns.eod.start = nx; ns.dep.B2 = nx; ns.sg.B2 = nx;
-      state = ns; persist(); recalc(); renderSettings(); toast('Started ' + monthLabel());
-    };
   }
+  // ---------- MONTH / YEAR + BRANCH ----------
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  function buildPeriodPickers() {
+    const sm = $('#selMonth'), sy = $('#selYear');
+    MONTHS.forEach((m, i) => sm.append(h('option', { value: i + 1 }, m)));
+    const y0 = +state.meta.monthStart.slice(0, 4);
+    for (let y = Math.min(2025, y0 - 1); y <= Math.max(2030, y0 + 2); y++) sy.append(h('option', { value: y }, String(y)));
+    const go = () => switchMonth(`${sy.value}-${String(sm.value).padStart(2, '0')}-01`);
+    sm.onchange = go; sy.onchange = go;
+    const bi = $('#branchInput');
+    bi.addEventListener('input', () => { state.meta.store = bi.value.toUpperCase(); clearTimeout(saveTimer); saveTimer = setTimeout(persist, 300); $('#hdrPeriod').textContent = (state.meta.store ? state.meta.store + ' · ' : '') + monthLabel(); bi.closest('.branch-badge').classList.toggle('empty', !state.meta.store); });
+    bi.addEventListener('change', () => { state.meta.store = bi.value.trim().toUpperCase(); changed(); if (currentTab !== 'dashboard' && currentTab !== 'entry') renderSheet(currentTab); });
+    bi.addEventListener('keydown', e => { if (e.key === 'Enter') bi.blur(); });
+  }
+  function blankMonth(from, iso) {
+    const ns = clone(from); ns.meta.monthStart = iso; ns.meta.runningDays = null;
+    for (const d of E.DAYS) { ns.ls[d] = {}; ns.manual[d] = {}; ns.outsale[d] = {}; ns.seas[d] = {}; ns.same[d] = ''; ns.eod.rows[d] = {}; ns.dep.rows[d] = {}; ns.sg.rows[d] = {}; ns.ytd.shoes[d] = {}; }
+    ns.msi = []; ns.mret = [];
+    return ns;
+  }
+  function switchMonth(iso) {
+    if (iso === state.meta.monthStart) return;
+    const months = store.get(K_MONTHS, {});
+    months[state.meta.monthStart.slice(0, 7)] = state;                 // keep this month on the device
+    let next = months[iso.slice(0, 7)];
+    if (next) { next.meta.store = state.meta.store; next.meta.branch = state.meta.branch; next.meta.recipient = state.meta.recipient; next.ytd = state.ytd; next.ytdrd = state.ytdrd; }
+    else next = blankMonth(state, iso);
+    next.eod.start = iso; next.dep.B2 = iso; next.sg.B2 = iso; next.sg.B3 = state.meta.store;
+    delete months[iso.slice(0, 7)];
+    store.set(K_MONTHS, months);
+    state = next; entryDay = 1; persist(); recalc();
+    if (currentTab === 'entry') renderEntry(); else if (currentTab !== 'dashboard' && currentTab !== 'settings') renderSheet(currentTab); else if (currentTab === 'settings') renderSettings();
+    toast(`${monthLabel()} · ${out.meta.daysInMonth} days · ${out.seas.head.weeks.length} weeks (Mon–Sun)` + (months[iso.slice(0, 7)] ? '' : ''));
+  }
+
   // ---------- SEND ----------
   function templateBytes() {
     const b64 = store.raw(K_TPL) || window.MTD_TEMPLATE_B64;
@@ -5038,7 +5106,7 @@ ${row('Entering / buying customers', F.int(s.entering) + ' / ' + F.int(s.buying)
 
   // ---------- init ----------
   function init() {
-    buildTabs(); bindSettings(); persist();
+    buildTabs(); buildPeriodPickers(); bindSettings(); persist();
     $('#btnSend').onclick = openSend; $('#btnSend2').onclick = openSend;
     $('#btnDownload').onclick = async () => { const b = $('#btnDownload'); b.disabled = true; try { downloadBlob(await buildWorkbook(), fileName()); } catch (e) { toast('Could not build workbook: ' + e.message); } b.disabled = false; };
     $('#daySel').onchange = e => { entryDay = +e.target.value; renderEntry(); };
