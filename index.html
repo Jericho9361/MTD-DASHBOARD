@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MTD Sales Dashboard</title>
+<meta name="description" content="Toby's Sports Month-to-Date sales dashboard built on the MEG MTD template.">
+<meta name="theme-color" content="#0E1F5B">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <div class="crest" aria-hidden="true">MTD</div>
+    <div>
+      <div class="brand-title">Month-to-Date Dashboard</div>
+      <div class="brand-sub"><span id="hdrStore">—</span> · <span id="hdrPeriod">—</span></div>
+    </div>
+  </div>
+  <div class="top-actions">
+    <div class="pill on" title="No server — everything is saved on this device"><span class="dot"></span>Saved on this device</div>
+    <div class="pill" id="storagePill" title="Data saved on this device">💾 <span id="storageText">0 KB</span></div>
+    <button class="btn ghost" id="btnDownload" title="Download the filled MTD workbook">⬇ Workbook</button>
+    <button class="btn gold" id="btnSend">✉ Send to Franchise Dev</button>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs" role="tablist"></nav>
+
+<main id="main">
+  <!-- DASHBOARD -->
+  <section class="view" id="view-dashboard">
+    <div class="asof" id="asof"></div>
+    <div class="hero">
+      <div class="card hero-main">
+        <div class="eyebrow">MTD Gross Sales</div>
+        <div class="hero-row">
+          <div>
+            <div class="big" id="kMTD">—</div>
+            <div class="sub">Target <b id="kTarget">—</b></div>
+            <div class="status" id="kStatus">—</div>
+          </div>
+          <svg class="ring" viewBox="0 0 120 120" aria-label="Sales achievement">
+            <circle cx="60" cy="60" r="50" class="ring-bg"/>
+            <circle cx="60" cy="60" r="50" class="ring-fg" id="ringFg" stroke-dasharray="314.16" stroke-dashoffset="314.16"/>
+            <text x="60" y="58" class="ring-val" id="ringVal">0%</text>
+            <text x="60" y="76" class="ring-lbl">of target</text>
+          </svg>
+        </div>
+      </div>
+      <div class="card hero-bars">
+        <div class="eyebrow">Pace check</div>
+        <div class="pace" id="paceBars"></div>
+        <div class="interp" id="interp"></div>
+      </div>
+    </div>
+
+    <h3 class="section-h">Sales status</h3>
+    <div class="kpis" id="kpiSales"></div>
+    <h3 class="section-h">Retail drivers <span class="muted">running LY vs this year</span></h3>
+    <div class="kpis" id="kpiDrivers"></div>
+    <h3 class="section-h">Cash &amp; controls</h3>
+    <div class="kpis" id="kpiCash"></div>
+
+    <div class="charts">
+      <div class="card chart-card"><div class="eyebrow">Daily gross sales · TY vs LY vs daily target</div><div class="chart-box"><canvas id="chDaily"></canvas></div></div>
+      <div class="card chart-card"><div class="eyebrow">Running MTD vs seasonality &amp; straight-line target</div><div class="chart-box"><canvas id="chCum"></canvas></div></div>
+      <div class="card chart-card"><div class="eyebrow">Weekly sales · TY vs LY</div><div class="chart-box"><canvas id="chWeek"></canvas></div></div>
+      <div class="card chart-card"><div class="eyebrow">Entering vs buying customers · daily</div><div class="chart-box"><canvas id="chTraffic"></canvas></div></div>
+    </div>
+    <div class="card"><div class="eyebrow">Weekly sales report</div><div class="tbl-wrap" id="weeklyTbl"></div></div>
+  </section>
+
+  <!-- DAILY ENTRY -->
+  <section class="view" id="view-entry">
+    <div class="card entry-head">
+      <div>
+        <div class="eyebrow">Daily sales entry · LS_RPRO format</div>
+        <div class="entry-day">
+          <button class="btn ghost sm" id="dayPrev">‹</button>
+          <select id="daySel"></select>
+          <button class="btn ghost sm" id="dayNext">›</button>
+        </div>
+        <p class="hint">Type amounts the same way as the workbook — you can add POS readings directly, e.g. <code>102690.45+70551.9</code>. Figures save automatically on this device.</p>
+      </div>
+      <div class="entry-live" id="entryLive"></div>
+    </div>
+    <div id="entryForm"></div>
+    <div class="entry-foot">
+      <button class="btn ghost" id="btnClearDay">Clear this day</button>
+      <button class="btn royal" id="btnSaveNext">Save &amp; next day ›</button>
+      <button class="btn gold" id="btnSend2">✉ Send MTD to Franchise Dev</button>
+    </div>
+  </section>
+
+  <section class="view" id="view-sheet"><div id="sheetHost"></div></section>
+
+  <!-- SETTINGS -->
+  <section class="view" id="view-settings">
+    <div class="settings-grid">
+      <div class="card">
+        <div class="eyebrow">Store &amp; month</div>
+        <label>Store name <input id="sStore"></label>
+        <label>Branch / store code <input id="sBranch"></label>
+        <label>Month start (LS_RPRO A2) <input id="sMonth" type="date"></label>
+        <label>Gross sales target (Seasonality G15) <input id="sTarget" inputmode="decimal"></label>
+        <label>Gross margin target (M15) <input id="sGM" inputmode="decimal"></label>
+        <label>Running days (J20) — leave blank for automatic <input id="sRun" inputmode="numeric" placeholder="auto"></label>
+        <label>Send to <input id="sTo" type="email"></label>
+        <label>CC (optional) <input id="sCc" placeholder="comma separated"></label>
+        <button class="btn royal" id="btnSaveSettings">Save settings</button>
+      </div>
+      <div class="card">
+        <div class="eyebrow">Data on this device</div>
+        <p class="hint">There is no server. Everything is stored only in this browser on this device. Use a backup file to keep a copy or move the data to another device.</p>
+        <div class="row-btns">
+          <button class="btn ghost" id="btnBackup">Back up (JSON)</button>
+          <label class="btn ghost file">Restore… <input type="file" id="fRestore" accept=".json" hidden></label>
+        </div>
+        <div class="row-btns">
+          <label class="btn ghost file">Replace template… <input type="file" id="fTemplate" accept=".xlsx" hidden></label>
+          <button class="btn ghost" id="btnTplReset">Use built-in template</button>
+        </div>
+        <div class="row-btns">
+          <button class="btn ghost" id="btnNewMonth">Start next month</button>
+          <button class="btn danger" id="btnReset">Reset to original data</button>
+        </div>
+        <div class="hint" id="tplStatus"></div>
+      </div>
+      <div class="card">
+        <div class="eyebrow">Send history</div>
+        <div id="sendLog" class="log"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+<dialog id="sendDlg">
+  <form method="dialog" class="dlg">
+    <div class="eyebrow">Send MTD report</div>
+    <div id="sendBody"></div>
+    <div class="row-btns end"><button class="btn ghost" value="cancel">Cancel</button><button class="btn gold" id="sendGo" value="go">Send now</button></div>
+  </form>
+</dialog>
+
+<script src="vendor/jszip.min.js"></script>
+<script src="vendor/chart.umd.min.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/template.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/exporter.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
